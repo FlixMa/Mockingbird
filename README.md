@@ -9,6 +9,7 @@
 - Supports resizing (aspect fit)
 - Supports Multicore Systems
 
+<img src="./assets/ipad129_iphone11.png" width="100%">
 
 ## The Long Story
 
