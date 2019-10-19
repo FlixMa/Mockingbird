@@ -113,7 +113,6 @@ def resize_and_pad(input, output_size=None, debug_depth=0):
 
         width_ratio = dest_width / orig_width
         height_ratio = dest_height / orig_height
-        print(width_ratio, height_ratio)
         if width_ratio < height_ratio:
             # width is constraining
             resized = cv.resize(input, dsize=(0, 0), fx=width_ratio, fy=width_ratio)
@@ -283,9 +282,8 @@ class MockingBird:
             os.makedirs(output_directory)
 
 
-        #with Pool(max_workers=num_workers) as pool:
-        #    pool.
-        list(map(self.create_mockup, screenshot_filepaths_per_feature, repeat(output_directory), repeat(output_size), repeat(debug)))
+        with Pool(max_workers=num_workers) as pool:
+            pool.map(self.create_mockup, screenshot_filepaths_per_feature, repeat(output_directory), repeat(output_size), repeat(debug))
 
 
 
