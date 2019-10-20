@@ -10,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor as Pool
 def extract_layer(layer):
     layer.compose().save('./{}_{}_{}.png'.format(layer.name.replace(' ', '_'), layer.offset[0], layer.offset[1]))
 
-def layer_to_opencv(layer):
-    pil_image = layer.compose().convert('RGBA')
+def layer_to_opencv(layer, bbox=None):
+    pil_image = layer.compose(bbox=bbox).convert('RGBA')
     open_cv_image = np.array(pil_image).copy()
     # Convert RGBA to BGRA float image
     return np.float32(cv.cvtColor(open_cv_image, cv.COLOR_RGBA2BGRA)) / 255.0
@@ -183,6 +183,8 @@ class MockingBird:
         ################### OPEN DOCUMENT AND EXTRACT LAYERS ###################
 
         self.document = PSDImage.open(document_filepath)
+        print('Content Offset'.rjust(16), self.document.offset)
+        print('Content Size'.rjust(16), self.document.size)
 
         self.frame_layers = []
         self.placeholder_layers = []
@@ -197,7 +199,7 @@ class MockingBird:
                 layer_name = layer_name[:layer_name.find('<')]
 
             if type(layer) == psd_tools.api.layers.PixelLayer:
-                print('Frame'.rjust(14), layer_name.ljust(32), layer.size, layer.mask)
+                print('Frame'.rjust(16), layer_name.ljust(32), layer.size, layer.mask)
                 self.frame_layers.append(layer)
 
                 # TODO: maybe this is a lot faster?
@@ -206,7 +208,7 @@ class MockingBird:
 
 
             elif type(layer) == psd_tools.api.layers.SmartObjectLayer:
-                print('Placeholder'.rjust(14), layer_name.ljust(32), layer.size, layer.mask)
+                print('Placeholder'.rjust(16), layer_name.ljust(32), layer.size, layer.mask)
                 self.placeholder_layers.append(layer)
 
         self.num_placeholders = len(self.placeholder_layers)
@@ -220,20 +222,40 @@ class MockingBird:
         print('rendering frames...', end='', flush=True)
         self.frame_images = []
         for frame_layer in self.frame_layers:
-            frame_image = layer_to_opencv(frame_layer)
             frame_bbox = frame_layer.bbox
             if frame_layer.has_mask():
                 frame_bbox = frame_layer.mask.bbox
+
+            frame_bbox = list(frame_bbox)
+            # bbox = (left, top, right, bottom)
+            frame_bbox[0] = max(frame_bbox[0], self.document.viewbox[0])
+            frame_bbox[1] = max(frame_bbox[1], self.document.viewbox[1])
+            frame_bbox[2] = min(frame_bbox[2], self.document.viewbox[2])
+            frame_bbox[3] = min(frame_bbox[3], self.document.viewbox[3])
+            frame_bbox = tuple(frame_bbox)
+
+            frame_image = layer_to_opencv(frame_layer, bbox=frame_bbox)
+
             self.frame_images.append((frame_image, frame_bbox))
         print(' -> done :-)')
 
         print('extracting masks...', end='', flush=True)
         self.placeholder_masks = []
         for placeholder_layer in self.placeholder_layers:
-            placeholder_mask = layer_to_opencv(placeholder_layer)[:, :, -1]
             mask_bbox = placeholder_layer.bbox
             if placeholder_layer.has_mask():
                 mask_bbox = placeholder_layer.mask.bbox
+
+            # account for offsets on viewbox of document
+            # bbox = (left, top, right, bottom)
+            mask_bbox = list(mask_bbox)
+            mask_bbox[0] = max(mask_bbox[0], self.document.viewbox[0])
+            mask_bbox[1] = max(mask_bbox[1], self.document.viewbox[1])
+            mask_bbox[2] = min(mask_bbox[2], self.document.viewbox[2])
+            mask_bbox[3] = min(mask_bbox[3], self.document.viewbox[3])
+            mask_bbox = tuple(mask_bbox)
+
+            placeholder_mask = layer_to_opencv(placeholder_layer, bbox=mask_bbox)[:, :, -1]
             self.placeholder_masks.append((placeholder_mask, mask_bbox))
         print(' -> done :-)')
 
@@ -241,7 +263,7 @@ class MockingBird:
         canvas_4C = np.zeros((self.document.height, self.document.width, 4), dtype=np.float32)
 
         if debug:
-            print('\tdocument:'.ljust(24), self.document.width, self.document.height, self.document.bbox)
+            print('\tdocument:'.ljust(24), self.document.width, self.document.height, self.document.bbox, self.document.viewbox)
             print('\tcanvas_4C:'.ljust(24), canvas_4C.shape, canvas_4C.dtype)
 
         for i in range(len(screenshots_3C)):
