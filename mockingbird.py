@@ -33,7 +33,7 @@ def combine(background_4C, foreground_4C, mask_1C=None, debug_depth=None):
 
 
     if debug_depth is not None:
-        print('\t' * debug_depth + 'combining background and foreground using mask')
+        print('\n' + '\t' * debug_depth + 'combining background and foreground using mask')
         print('\t' * debug_depth + '\tbackground_4C:'.ljust(24), background_4C.shape, background_4C.dtype)
         print('\t' * debug_depth + '\tforeground_4C:'.ljust(24), foreground_4C.shape, background_4C.dtype)
         print('\t' * debug_depth + '\tmask_alpha_3C:'.ljust(24), mask_alpha_3C.shape, mask_alpha_3C.dtype)
@@ -57,11 +57,11 @@ def combine(background_4C, foreground_4C, mask_1C=None, debug_depth=None):
 
     return merged_4C
 
-def add_layer(background_4C, foreground_4C, bbox, debug_depth=0):
+def add_layer(background_4C, foreground_4C, bbox, debug_depth=None):
     # bbox = (left, top, right, bottom)
-    assert background_4C.shape[0] > bbox[3]
-    assert background_4C.shape[1] > bbox[2]
-    assert background_4C.shape[2] == 4
+    assert background_4C.shape[0] >= bbox[3], 'background height is to small: {} >= {}'.format(background_4C.shape[0], bbox[3])
+    assert background_4C.shape[1] >= bbox[2], 'background width is to small: {} >= {}'.format(background_4C.shape[1], bbox[2])
+    assert background_4C.shape[2] == 4, 'background doesnt have 4 channels: {} >= 4'.format(background_4C.shape[2])
 
     background_region_4C = background_4C[bbox[1]:bbox[3], bbox[0]:bbox[2]]
 
@@ -70,11 +70,11 @@ def add_layer(background_4C, foreground_4C, bbox, debug_depth=0):
     background_4C[bbox[1]:bbox[3], bbox[0]:bbox[2]] = merged_4C
     return background_4C
 
-def add_screen(background_4C, screenshot_3C, mask_1C, bbox, debug_depth=0):
+def add_screen(background_4C, screenshot_3C, mask_1C, bbox, debug_depth=None):
     # bbox = (left, top, right, bottom)
-    assert background_4C.shape[0] > bbox[3]
-    assert background_4C.shape[1] > bbox[2]
-    assert background_4C.shape[2] == 4
+    assert background_4C.shape[0] >= bbox[3], 'background height is to small: {} >= {}'.format(background_4C.shape[0], bbox[3])
+    assert background_4C.shape[1] >= bbox[2], 'background width is to small: {} >= {}'.format(background_4C.shape[1], bbox[2])
+    assert background_4C.shape[2] == 4, 'background doesnt have 4 channels: {} >= 4'.format(background_4C.shape[2])
 
     screenshot_3C = cv.resize(screenshot_3C, (mask_1C.shape[1], mask_1C.shape[0]))
 
@@ -83,7 +83,7 @@ def add_screen(background_4C, screenshot_3C, mask_1C, bbox, debug_depth=0):
 
 
     if debug_depth is not None:
-        print('\t' * debug_depth + 'adding screen to existing canvas')
+        print('\n' + '\t' * debug_depth + 'adding screen to existing canvas')
         print('\t' * debug_depth + '\tbackground_4C:'.ljust(24), background_4C.shape, background_4C.dtype)
         print('\t' * debug_depth + '\tbackground_region_4C:'.ljust(24), background_region_4C.shape, background_region_4C.dtype)
         print('\t' * debug_depth + '\tscreenshot_3C:'.ljust(24), screenshot_3C.shape, screenshot_3C.dtype)
@@ -99,7 +99,24 @@ def add_screen(background_4C, screenshot_3C, mask_1C, bbox, debug_depth=0):
 
     return background_4C
 
-def resize_and_pad(input, output_size=None, debug_depth=0):
+def trim_alpha(input_4C, debug_depth=None):
+    alpha_1C = input_4C[:, :, -1]
+
+    x_occurences = np.where(np.any(alpha_1C, axis=0))[0]
+    y_occurences = np.where(np.any(alpha_1C, axis=1))[0]
+    mask_left = x_occurences.min()
+    mask_right = x_occurences.max()
+    mask_top = y_occurences.min()
+    mask_bottom = y_occurences.max()
+
+    if debug_depth is not None:
+        print('\n' + '\t' * debug_depth + 'trimming alpha on all sides')
+        print('\t' * debug_depth + '\tinput_4C:'.ljust(24), input_4C.shape, input_4C.dtype)
+        print('\t' * debug_depth + '\tnew bounding box:'.ljust(24), mask_left, mask_right, mask_top, mask_bottom)
+
+    return input_4C[mask_top:mask_bottom, mask_left:mask_right]
+
+def resize_and_pad(input, output_size=None, debug_depth=None):
     if not isinstance(output_size, tuple):
         return input
 
@@ -109,7 +126,7 @@ def resize_and_pad(input, output_size=None, debug_depth=0):
 
     if dest_width is not None and dest_height is not None:
         # height and width are defined
-        output = np.zeros((dest_height, dest_width, 4))
+        output = np.zeros((dest_height, dest_width, 4), dtype=np.float32)
 
         width_ratio = dest_width / orig_width
         height_ratio = dest_height / orig_height
@@ -147,6 +164,17 @@ def resize_and_pad(input, output_size=None, debug_depth=0):
         # width and height are both not given
         return input
 
+def make_opaque(input_4C, color, debug_depth=None):
+    assert len(color) == 3, 'this is not a color: {}'.format(color)
+
+    pixel_value = (color[2], color[1], color[0], 1)
+    background_4C = np.full(input_4C.shape, pixel_value, dtype=np.float32)
+    if debug_depth is not None:
+        print('\n' + '\t' * debug_depth + 'making image opaque')
+        print('\t' * debug_depth + '\tinput_4C:'.ljust(24), input_4C.shape, input_4C.dtype)
+        print('\t' * debug_depth + '\tcolor (bgra):'.ljust(24), pixel_value)
+
+    return combine(background_4C, input_4C, debug_depth=debug_depth+1 if debug_depth is not None else None)
 
 class MockingBird:
 
@@ -161,11 +189,15 @@ class MockingBird:
 
         #screen_idx = 0
         for layer in self.document.descendants():
-            if 'shadow' in layer.name.lower() or type(layer) == psd_tools.api.adjustments.SolidColorFill:
+            if 'shadow' in layer.name.lower() or 'status bar' in layer.name.lower() or type(layer) == psd_tools.api.adjustments.SolidColorFill:
                 continue
 
+            layer_name = layer.name
+            if '<' in layer_name:
+                layer_name = layer_name[:layer_name.find('<')]
+
             if type(layer) == psd_tools.api.layers.PixelLayer:
-                print('Frame'.rjust(14), layer.name.ljust(32), layer.size)
+                print('Frame'.rjust(14), layer_name.ljust(32), layer.size, layer.mask)
                 self.frame_layers.append(layer)
 
                 # TODO: maybe this is a lot faster?
@@ -174,7 +206,7 @@ class MockingBird:
 
 
             elif type(layer) == psd_tools.api.layers.SmartObjectLayer:
-                print('Placeholder'.rjust(14), layer.name.ljust(32), layer.size)
+                print('Placeholder'.rjust(14), layer_name.ljust(32), layer.size, layer.mask)
                 self.placeholder_layers.append(layer)
 
         self.num_placeholders = len(self.placeholder_layers)
@@ -205,13 +237,14 @@ class MockingBird:
             self.placeholder_masks.append((placeholder_mask, mask_bbox))
         print(' -> done :-)')
 
-    def embed_screenshots(self, screenshots_3C, output_size=None, debug=False):
+    def embed_screenshots(self, screenshots_3C, debug=False):
         canvas_4C = np.zeros((self.document.height, self.document.width, 4), dtype=np.float32)
 
         if debug:
+            print('\tdocument:'.ljust(24), self.document.width, self.document.height, self.document.bbox)
             print('\tcanvas_4C:'.ljust(24), canvas_4C.shape, canvas_4C.dtype)
 
-        for i in range(self.num_placeholders):
+        for i in range(len(screenshots_3C)):
 
             # add background frame
             (frame_4C, frame_bbox) = self.frame_images[i]
@@ -231,16 +264,27 @@ class MockingBird:
 
             canvas_4C = add_screen(canvas_4C, screenshots_3C[i], mask_1C, mask_bbox, debug_depth=1 if debug else None)
 
-        # resize to desired format
-        canvas_4C = resize_and_pad(canvas_4C, output_size)
         return canvas_4C
 
-    def create_mockup(self, screenshot_filepaths, output_directory, output_size=None, debug=False):
+    def create_mockup(self, screenshot_filepaths, output_directory, output_size=None, should_trim_alpha=False, background_color=None, debug=False):
 
         # read screenshots into memory
         screenshots_3C = list(map(lambda filepath: np.float32(cv.imread(filepath)) / 255.0, screenshot_filepaths))
 
-        output_4C = self.embed_screenshots(screenshots_3C, output_size=output_size, debug=debug)
+        # embed the screenshots in those device frames
+        output_4C = self.embed_screenshots(screenshots_3C, debug=debug)
+
+        # trim alpha from the sides
+        if should_trim_alpha:
+            output_4C = trim_alpha(output_4C, debug_depth=1 if debug else None)
+
+        # resize to desired format
+        output_4C = resize_and_pad(output_4C, output_size, debug_depth=1 if debug else None)
+
+        if background_color is not None:
+            output_4C = make_opaque(output_4C, background_color, debug_depth=1 if debug else None)
+
+        # convert back from float to byte
         output_4C = np.uint8(output_4C * 255.0)
 
         # write with new filename
@@ -257,8 +301,8 @@ class MockingBird:
         cv.imwrite(output_filepath, output_4C)
         print('mocked', output_filepath, flush=True)
 
-    def mock(self, screenshot_directories, output_directory, output_size=None, num_workers=os.cpu_count(), debug=False):
-        assert self.num_placeholders == len(screenshot_directories)
+    def mock(self, screenshot_directories, output_directory, output_size=None, should_trim_alpha=False, background_color=None, num_workers=os.cpu_count(), debug=False):
+        assert self.num_placeholders >= len(screenshot_directories)
 
         ############## RETRIEVE LIST OF ALL AVAILABLE SCREENSHOTS ##############
 
@@ -273,17 +317,34 @@ class MockingBird:
 
         print('found', num_screenshots, 'screenshots')
         screenshot_filepaths_per_directory = np.array(screenshot_filepaths_per_directory)
-
-        screenshot_filepaths_per_feature = np.transpose(screenshot_filepaths_per_directory)#, (self.num_placeholders, -1))
+        screenshot_filepaths_per_feature = np.transpose(screenshot_filepaths_per_directory)
 
         ################# ENSURE OUTPUT DIRECTORY IS AVAILABLE #################
 
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
 
+        arguments = [
+            self.create_mockup,
+            screenshot_filepaths_per_feature,
+            repeat(output_directory),
+            repeat(output_size),
+            repeat(should_trim_alpha),
+            repeat(background_color),
+            repeat(debug)
+        ]
 
-        with Pool(max_workers=num_workers) as pool:
-            pool.map(self.create_mockup, screenshot_filepaths_per_feature, repeat(output_directory), repeat(output_size), repeat(debug))
+        if num_workers > 1:
+            print('using multithreading with up to {} threads.'.format(num_workers))
+            with Pool(max_workers=num_workers) as pool:
+                results = pool.map(*arguments)
+                for result in results:
+                    # this loop lets those exceptions fire.
+                    pass
+        else:
+            print('multithreading disabled')
+            list(map(*arguments))
+
 
 
 
@@ -295,16 +356,23 @@ def main():
     parser.add_argument('--threads', type=int, default=os.cpu_count(), metavar='COUNT', help='maximum number of threads to use simultaneously (default: cpu count of local machine)')
     parser.add_argument('--width', type=int, default=None, metavar='PIXEL', help='width of the output image')
     parser.add_argument('--height', type=int, default=None, metavar='PIXEL', help='height of the output image')
-    args = parser.parse_args()
 
+    parser.add_argument('--trimalpha', action='store_true', help='flag, specifiyng whether the image should be trimmed to opaque pixels')
+    parser.add_argument('--bgcolor', type=float, default=None, nargs=3, metavar='f', help='background color specified as RGB fractions: 0 to 1. Specifiyng this option results in a totally opaque output image.')
+
+    parser.add_argument('--verbose', action='store_true', help='flag, specifiyng whether debug output is enabled')
+
+    args = parser.parse_args()
 
     bird = MockingBird(args.frame)
     bird.mock(
         args.screenshots,
         args.output,
         output_size=(args.width, args.height),
+        should_trim_alpha=args.trimalpha,
+        background_color=args.bgcolor,
         num_workers=args.threads,
-        debug=False
+        debug=args.verbose
     )
 
 if __name__ == '__main__':
