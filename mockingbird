@@ -12,10 +12,10 @@ from itertools import repeat
 from concurrent.futures import ThreadPoolExecutor as Pool
 
 def extract_layer(layer):
-    layer.compose().save('./{}_{}_{}.png'.format(layer.name.replace(' ', '_'), layer.offset[0], layer.offset[1]))
+    layer.composite().save('./{}_{}_{}.png'.format(layer.name.replace(' ', '_'), layer.offset[0], layer.offset[1]))
 
 def layer_to_opencv(layer, bbox=None):
-    pil_image = layer.compose(bbox=bbox).convert('RGBA')
+    pil_image = layer.composite(viewport=bbox).convert('RGBA')
     open_cv_image = np.array(pil_image).copy()
     # Convert RGBA to BGRA float image
     return np.float32(cv.cvtColor(open_cv_image, cv.COLOR_RGBA2BGRA)) / 255.0

@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='mockingbird-psd',
-    version="1.0.3",
+    version="1.0.4",
     author="Felix Maaß",
     author_email="mockingbird@flixma.de",
     description="Easily bulk embed your screenshots in Apple device mockups.",
