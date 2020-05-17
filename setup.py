@@ -6,8 +6,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='mockingbird',
-    version="0.0.1",
+    name='mockingbird-psd',
+    version="1.0.3",
     author="Felix Maaß",
     author_email="mockingbird@flixma.de",
     description="Easily bulk embed your screenshots in Apple device mockups.",
@@ -21,6 +21,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='~=3.6',
-    install_requires=['opencv-python', 'psd_tools'],
+    install_requires=['opencv-python', 'psd-tools'],
     scripts=['mockingbird']
 )

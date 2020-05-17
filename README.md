@@ -9,7 +9,7 @@
 - Supports resizing (aspect fit)
 - Supports Multicore Systems
 
-<img src="./assets/ipad129_iphone11.png" width="100%">
+<img src="https://github.com/FlixMa/Mockingbird/raw/master/assets/ipad129_iphone11.png" width="100%">
 
 ## The Long Story
 
@@ -18,11 +18,10 @@ Because the script reads the original photoshop documents Apple provides within 
 Multi-Frame Mockups, e.g. one containing iPad and iPhone, are supported.
 
 
-### Prerequisites
+### Installation
 
-- Python 3
-- OpenCV 4 (might work with lower versions)
-- psd-tools (can be installed from pip)
+The only prerequisite is Python 3.6 or higher. On macOS its comfy to install it via homebrew, i.e. `brew install python3`.
+To install mockingbird, use `pip3 install mockingbird-psd`.
 
 
 ### Instructions
@@ -32,15 +31,15 @@ Each folder represents one device and contains the screenshots for every feature
 The folders are specified using the `--screenshots` parameter.
 Concerning the layers of the photoshop document, the folders should be given from background to foreground.
 
-You might also want to have a look at the usage message `python3 mockingbird.py --help`
+You might also want to have a look at the usage message `mockingbird --help`
 
 #### Single-Frame mockups:
 
-`python3 mockingbird.py --frame ./iphone_11.psd --screenshots ./iphone11`
+`mockingbird --frame ./iphone_11.psd --screenshots ./iphone11`
 
 
 #### Multi-Frame mockups:
 
-`python3 mockingbird.py --frame ./ipad_iphone.psd --screenshots ./ipad129inch ./iphone11`
+`mockingbird --frame ./ipad_iphone.psd --screenshots ./ipad129inch ./iphone11`
 
 This command uses the dual-device psd file and combines it with the images from `./ipad129inch` in the background device and `./iphone11` in the foreground device.
